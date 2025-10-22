@@ -70,7 +70,7 @@ CipherCare uses Zama's fhEVM to enable:
 
 ### System Overview
 
-\`\`\`
+```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Frontend (React)                        │
 │  ┌────────────────────────────────────────────────────────┐ │
@@ -104,27 +104,27 @@ CipherCare uses Zama's fhEVM to enable:
 │  │  • Status management                     │              │
 │  └──────────────────────────────────────────┘              │
 └─────────────────────────────────────────────────────────────┘
-\`\`\`
+```
 
 ### Data Flow
 
 1. **Benefit Submission**
-   \`\`\`
+   ```
    User Input → FHE Encryption (Client) → Encrypted Data + Signature →
    Smart Contract → On-chain Storage (euint64)
-   \`\`\`
+   ```
 
 2. **Benefit Verification**
-   \`\`\`
+   ```
    Encrypted Data → FHE Computation → Result (Still Encrypted) →
    Authorized Decryption (if needed) → Status Update
-   \`\`\`
+   ```
 
 3. **Benefit Claim**
-   \`\`\`
+   ```
    Member Request → Contract Verification → FHE Computation →
    Token Transfer → Event Emission
-   \`\`\`
+   ```
 
 ---
 
@@ -134,7 +134,7 @@ CipherCare uses Zama's fhEVM to enable:
 
 FHE allows computations on encrypted data without decrypting it first. In CipherCare:
 
-\`\`\`solidity
+```solidity
 // Traditional approach (insecure)
 uint256 amount = 1000; // Visible on-chain
 require(amount <= maxAmount, "Exceeds limit");
@@ -143,12 +143,12 @@ require(amount <= maxAmount, "Exceeds limit");
 euint64 encryptedAmount = ...; // Encrypted on-chain
 ebool isValid = TFHE.le(encryptedAmount, encryptedMaxAmount);
 // Computation happens on encrypted data!
-\`\`\`
+```
 
 ### FHE Implementation in CipherCare
 
 #### Client-Side Encryption
-\`\`\`typescript
+```typescript
 // webapp/src/lib/fhe.ts
 import { createInstance, initSDK, SepoliaConfig } from '@zama-fhe/relayer-sdk/bundle';
 
@@ -162,10 +162,10 @@ const encryptedPolicyId = await fheInstance.encrypt64(policyId);
 
 // Generate signature for authorization
 const signature = await fheInstance.sign();
-\`\`\`
+```
 
 #### On-Chain Processing
-\`\`\`solidity
+```solidity
 // contracts/core/BenefitVault.sol (Simplified version shown)
 function recordBenefit(
     bytes calldata encryptedAmount,
@@ -186,7 +186,7 @@ function recordBenefit(
         timestamp: block.timestamp
     }));
 }
-\`\`\`
+```
 
 ### Privacy Guarantees
 
@@ -205,7 +205,7 @@ function recordBenefit(
 
 ### Contract Architecture
 
-\`\`\`
+```
 contracts/
 ├── core/
 │   ├── AccessControl.sol          // Role-based permissions
@@ -218,7 +218,7 @@ contracts/
 │   ├── IPolicyManager.sol
 │   └── IBenefitVault.sol
 └── test contracts...
-\`\`\`
+```
 
 ### Core Contracts
 
@@ -226,23 +226,23 @@ contracts/
 Manages roles and permissions using OpenZeppelin's AccessControl pattern.
 
 **Roles:**
-- \`DEFAULT_ADMIN_ROLE\`: System administrator
-- \`GOVERNOR_ROLE\`: Policy creation and management
-- \`COUNCIL_MEMBER_ROLE\`: High-level governance decisions
-- \`ASSESSOR_ROLE\`: Benefit claim verification
-- \`AUDITOR_ROLE\`: System auditing and compliance
-- \`MEMBER_ROLE\`: Benefit recipients
+- `DEFAULT_ADMIN_ROLE`: System administrator
+- `GOVERNOR_ROLE`: Policy creation and management
+- `COUNCIL_MEMBER_ROLE`: High-level governance decisions
+- `ASSESSOR_ROLE`: Benefit claim verification
+- `AUDITOR_ROLE`: System auditing and compliance
+- `MEMBER_ROLE`: Benefit recipients
 
-\`\`\`solidity
+```solidity
 function grantRole(bytes32 role, address account) external onlyAdmin;
 function hasRole(bytes32 role, address account) external view returns (bool);
-\`\`\`
+```
 
 #### 2. SimplePolicyManager
 Manages benefit policies and eligibility criteria.
 
 **Key Functions:**
-\`\`\`solidity
+```solidity
 function createPolicy(
     string memory name,
     string memory description,
@@ -251,10 +251,10 @@ function createPolicy(
 
 function getActivePolicies() external view returns (Policy[] memory);
 function getPolicyDetails(uint256 policyId) external view returns (...);
-\`\`\`
+```
 
 **Policy Structure:**
-\`\`\`solidity
+```solidity
 struct Policy {
     string name;              // e.g., "Health Insurance"
     string description;       // Policy details
@@ -264,13 +264,13 @@ struct Policy {
     uint8 priority;          // Priority level
     address creator;         // Policy creator address
 }
-\`\`\`
+```
 
 #### 3. SimpleBenefitVault
 Stores and manages benefit records (current implementation uses plaintext for testing).
 
 **Key Functions:**
-\`\`\`solidity
+```solidity
 function recordBenefit(
     uint256 policyId,
     uint256 amount,
@@ -283,10 +283,10 @@ function getBenefitRecord(address member, uint256 index)
 
 function updateBenefitStatus(address member, uint256 index, uint8 status)
     external onlyAssessor;
-\`\`\`
+```
 
 **Benefit Structure:**
-\`\`\`solidity
+```solidity
 struct BenefitRecord {
     uint256 policyId;        // Associated policy
     uint256 amount;          // Benefit amount
@@ -295,15 +295,15 @@ struct BenefitRecord {
     string benefitType;      // Category
     string description;      // Additional details
 }
-\`\`\`
+```
 
 ### Deployed Contracts (Sepolia Testnet)
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| AccessControl | \`0x428a7a4c836bEdb3BFAC9c45Aa722Af54e6959eB\` | Role management |
-| SimplePolicyManager | \`0x84a8AECd30Afab760D5Bccd2d5420c55601b1708\` | Policy CRUD |
-| SimpleBenefitVault | \`0xC054f4fb4d8366010615d564175A52F3f16749C6\` | Benefit storage |
+| AccessControl | `0x428a7a4c836bEdb3BFAC9c45Aa722Af54e6959eB` | Role management |
+| SimplePolicyManager | `0x84a8AECd30Afab760D5Bccd2d5420c55601b1708` | Policy CRUD |
+| SimpleBenefitVault | `0xC054f4fb4d8366010615d564175A52F3f16749C6` | Benefit storage |
 
 ---
 
@@ -318,7 +318,7 @@ struct BenefitRecord {
 
 ### Installation
 
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/lulan55892566kevinhernandez/CipherCare.git
 cd CipherCare
@@ -329,22 +329,22 @@ npm install
 # Install webapp dependencies
 cd webapp
 npm install
-\`\`\`
+```
 
 ### Configuration
 
 1. **Environment Setup**
-\`\`\`bash
+```bash
 # Copy environment template
 cp .env.example .env
 
 # Configure variables
 SEPOLIA_RPC_URL=your_rpc_url
 DEPLOYER_PRIVATE_KEY=your_private_key
-\`\`\`
+```
 
 2. **Frontend Configuration**
-\`\`\`bash
+```bash
 cd webapp
 cp .env.example .env
 
@@ -352,11 +352,11 @@ cp .env.example .env
 VITE_ACCESS_CONTROL_ADDRESS=0x428a7a4c836bEdb3BFAC9c45Aa722Af54e6959eB
 VITE_POLICY_MANAGER_ADDRESS=0x84a8AECd30Afab760D5Bccd2d5420c55601b1708
 VITE_BENEFIT_VAULT_ADDRESS=0xC054f4fb4d8366010615d564175A52F3f16749C6
-\`\`\`
+```
 
 ### Running Locally
 
-\`\`\`bash
+```bash
 # Terminal 1: Start local Hardhat node (optional)
 npx hardhat node
 
@@ -366,13 +366,13 @@ npx hardhat run scripts/deploy.js --network localhost
 # Terminal 3: Start frontend
 cd webapp
 npm run dev
-\`\`\`
+```
 
-Visit \`http://localhost:8081\`
+Visit `http://localhost:8081`
 
 ### Testing
 
-\`\`\`bash
+```bash
 # Run all contract tests
 npx hardhat test
 
@@ -387,7 +387,7 @@ npx hardhat test test/Integration.test.js
 # Frontend tests
 cd webapp
 npm run test
-\`\`\`
+```
 
 ---
 
@@ -486,7 +486,7 @@ We welcome contributions from the community! Here's how you can help:
 
 ### Development Workflow
 
-\`\`\`bash
+```bash
 # Fork the repository
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -501,7 +501,7 @@ git commit -m "feat: add encrypted benefit export"
 
 # Push and create PR
 git push origin feature/your-feature-name
-\`\`\`
+```
 
 ### Code Standards
 
