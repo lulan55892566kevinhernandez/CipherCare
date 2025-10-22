@@ -1,17 +1,13 @@
-import { Shield } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const navigate = useNavigate();
-  
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-            <Shield className="w-6 h-6 text-primary-foreground" />
-          </div>
+        <div className="cursor-pointer" onClick={() => navigate('/')}>
           <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             CipherCare
           </span>
