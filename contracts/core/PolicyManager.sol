@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "fhevm/lib/TFHE.sol";
+import {FHE, euint64, euint32, euint8, externalEuint64} from "@fhevm/solidity/lib/FHE.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 import {IAccessControl} from "../interfaces/IAccessControl.sol";
 
@@ -9,8 +10,9 @@ import {IAccessControl} from "../interfaces/IAccessControl.sol";
  * @title PolicyManager
  * @dev FHE-encrypted policy management contract - manages benefit policies with encrypted parameters
  * @notice Implements FHE encryption for privacy-preserving policy management
+ * @dev Updated for fhEVM 0.9.1 - inherits ZamaEthereumConfig for automatic coprocessor setup
  */
-contract PolicyManager is IPolicyManager {
+contract PolicyManager is IPolicyManager, ZamaEthereumConfig {
     
     // ============ State Variables ============
     
@@ -56,10 +58,13 @@ contract PolicyManager is IPolicyManager {
     ) external onlyAuthorized returns (uint256) {
         uint256 policyId = nextPolicyId++;
         
-        // Encrypt the policy parameters
-        euint64 encryptedMaxAmount = TFHE.asEuint64(maxAmount);
-        euint32 encryptedCreatedAt = TFHE.asEuint32(block.timestamp);
-        euint8 encryptedPriority = TFHE.asEuint8(1); // Default priority level
+        // Encrypt the policy parameters using FHE (fhEVM 0.9.1)
+        euint64 encryptedMaxAmount = FHE.asEuint64(uint64(maxAmount));
+        FHE.allowThis(encryptedMaxAmount);
+        euint32 encryptedCreatedAt = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedCreatedAt);
+        euint8 encryptedPriority = FHE.asEuint8(uint8(1)); // Default priority level
+        FHE.allowThis(encryptedPriority);
         
         encryptedPolicies[policyId] = EncryptedPolicy({
             name: name,
@@ -85,11 +90,14 @@ contract PolicyManager is IPolicyManager {
     ) external onlyAuthorized returns (uint256) {
         uint256 policyId = nextPolicyId++;
         
-        // Use provided encrypted data
+        // Use provided encrypted data (fhEVM 0.9.1)
         // For actual FHE usage, encrypted data should be decoded properly
-        euint64 encryptedMaxAmountValue = TFHE.asEuint64(0); // Placeholder
-        euint32 encryptedCreatedAt = TFHE.asEuint32(block.timestamp);
-        euint8 encryptedPriorityValue = TFHE.asEuint8(0); // Placeholder
+        euint64 encryptedMaxAmountValue = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(encryptedMaxAmountValue);
+        euint32 encryptedCreatedAt = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedCreatedAt);
+        euint8 encryptedPriorityValue = FHE.asEuint8(uint8(0)); // Placeholder
+        FHE.allowThis(encryptedPriorityValue);
         
         encryptedPolicies[policyId] = EncryptedPolicy({
             name: name,
@@ -117,8 +125,10 @@ contract PolicyManager is IPolicyManager {
         
         encryptedPolicies[policyId].name = name;
         encryptedPolicies[policyId].description = description;
-        encryptedPolicies[policyId].encryptedMaxAmount = TFHE.asEuint64(maxAmount);
-        
+        euint64 newMaxAmount = FHE.asEuint64(uint64(maxAmount));
+        FHE.allowThis(newMaxAmount);
+        encryptedPolicies[policyId].encryptedMaxAmount = newMaxAmount;
+
         emit PolicyUpdated(policyId, name, maxAmount);
     }
     
@@ -132,8 +142,10 @@ contract PolicyManager is IPolicyManager {
         
         encryptedPolicies[policyId].name = name;
         encryptedPolicies[policyId].description = description;
-        encryptedPolicies[policyId].encryptedMaxAmount = TFHE.asEuint64(0); // Placeholder
-        
+        euint64 newMaxAmount = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(newMaxAmount);
+        encryptedPolicies[policyId].encryptedMaxAmount = newMaxAmount;
+
         emit PolicyUpdated(policyId, name, 0); // Amount is encrypted
     }
     
@@ -165,12 +177,14 @@ contract PolicyManager is IPolicyManager {
     
     function addToPolicyAmount(uint256 policyId, uint256 amount) external onlyAuthorized {
         require(policyId < nextPolicyId, "Policy does not exist");
-        
+
         euint64 currentAmount = encryptedPolicies[policyId].encryptedMaxAmount;
-        euint64 additionalAmount = TFHE.asEuint64(amount);
-        
-        // Add encrypted amounts
-        encryptedPolicies[policyId].encryptedMaxAmount = TFHE.add(currentAmount, additionalAmount);
+        euint64 additionalAmount = FHE.asEuint64(uint64(amount));
+
+        // Add encrypted amounts using FHE (fhEVM 0.9.1)
+        euint64 newAmount = FHE.add(currentAmount, additionalAmount);
+        FHE.allowThis(newAmount);
+        encryptedPolicies[policyId].encryptedMaxAmount = newAmount;
     }
     
     // ============ View Functions ============
