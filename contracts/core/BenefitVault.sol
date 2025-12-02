@@ -2,14 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {FHE, euint64, euint8, externalEuint64} from "@fhevm/solidity/lib/FHE.sol";
-import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
 /**
  * @title BenefitVault
  * @notice Privacy-preserving benefit storage with FHE encryption
  * @dev Following Zama FHE best practices: fromExternal, allowThis, allow
+ * @dev Updated for fhEVM 0.9.1 - inherits ZamaEthereumConfig for automatic coprocessor setup
  */
-contract BenefitVault is SepoliaConfig {
+contract BenefitVault is ZamaEthereumConfig {
 
     address public admin;
 
@@ -55,8 +56,8 @@ contract BenefitVault is SepoliaConfig {
         require(!benefitExists[benefitId], "Benefit record already exists");
 
         euint64 encryptedAmount = FHE.fromExternal(encAmount, inputProof);
-        euint64 encryptedPolicyId = FHE.asEuint64(policyId);
-        euint8 encryptedStatus = FHE.asEuint8(0);
+        euint64 encryptedPolicyId = FHE.asEuint64(uint64(policyId));
+        euint8 encryptedStatus = FHE.asEuint8(uint8(0));
 
         FHE.allowThis(encryptedAmount);
         FHE.allow(encryptedAmount, member);
@@ -107,7 +108,7 @@ contract BenefitVault is SepoliaConfig {
         require(member != address(0), "Invalid member address");
         require(index < encryptedMemberBenefits[member].length, "Benefit record not found");
 
-        euint8 frozenStatus = FHE.asEuint8(1);
+        euint8 frozenStatus = FHE.asEuint8(uint8(1));
         FHE.allowThis(frozenStatus);
         encryptedMemberBenefits[member][index].encryptedStatus = frozenStatus;
 
@@ -122,7 +123,7 @@ contract BenefitVault is SepoliaConfig {
         require(member != address(0), "Invalid member address");
         require(index < encryptedMemberBenefits[member].length, "Benefit record not found");
 
-        euint8 flaggedStatus = FHE.asEuint8(2);
+        euint8 flaggedStatus = FHE.asEuint8(uint8(2));
         FHE.allowThis(flaggedStatus);
         encryptedMemberBenefits[member][index].encryptedStatus = flaggedStatus;
 
@@ -137,7 +138,7 @@ contract BenefitVault is SepoliaConfig {
         require(member != address(0), "Invalid member address");
         require(index < encryptedMemberBenefits[member].length, "Benefit record not found");
 
-        euint64 additionalAmount = FHE.asEuint64(amount);
+        euint64 additionalAmount = FHE.asEuint64(uint64(amount));
         euint64 currentAmount = encryptedMemberBenefits[member][index].encryptedAmount;
         euint64 newAmount = FHE.add(currentAmount, additionalAmount);
 
