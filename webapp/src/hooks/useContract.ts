@@ -21,9 +21,9 @@ export const useContractRead = (functionName: string, args: any[] = [], abi: any
 export const useContractWrite = () => {
   const { chain } = useAccount();
   const chainId = chain?.id || sepolia.id;
-  
+
   const { writeContract, data: hash, error, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
@@ -35,6 +35,7 @@ export const useContractWrite = () => {
       functionName,
       args,
       chainId,
+      gas: 500_000n, // Explicit gas limit for Sepolia
     });
   };
 
@@ -93,6 +94,7 @@ export const useSubmitBenefit = () => {
       functionName,
       args,
       chainId,
+      gas: 500_000n, // Explicit gas limit for Sepolia
     });
   };
 
@@ -215,9 +217,9 @@ export const usePolicyManagerRead = (functionName: string, args: any[] = []) => 
 export const usePolicyManagerWrite = () => {
   const { chain } = useAccount();
   const chainId = chain?.id || sepolia.id;
-  
+
   const { writeContract, data: hash, error, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
@@ -229,6 +231,7 @@ export const usePolicyManagerWrite = () => {
       functionName,
       args,
       chainId,
+      gas: 500_000n, // Explicit gas limit for Sepolia
     });
   };
 
