@@ -2,12 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {FHE, euint64, externalEuint64} from "@fhevm/solidity/lib/FHE.sol";
-import {ZamaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
 /// @title CrypticBenefitNetworkV2
 /// @notice Simplified FHE-enabled welfare policy manager where anyone can author policies
 /// @dev Focuses on base functionality while preserving encrypted accounting.
-contract CrypticBenefitNetworkV2 {
+/// @dev Updated for fhEVM 0.9.1 - inherits ZamaEthereumConfig for automatic coprocessor setup
+contract CrypticBenefitNetworkV2 is ZamaEthereumConfig {
     /// -----------------------------------------------------------------------
     /// Errors
     /// -----------------------------------------------------------------------
@@ -65,14 +66,13 @@ contract CrypticBenefitNetworkV2 {
     /// -----------------------------------------------------------------------
 
     constructor() {
-        FHE.setCoprocessor(ZamaConfig.getSepoliaConfig());
-
+        // fhEVM 0.9.1: Coprocessor is automatically configured via ZamaEthereumConfig inheritance
         nextPolicyId = 1;
 
-        encryptedTotalPolicies = FHE.asEuint64(0);
+        encryptedTotalPolicies = FHE.asEuint64(uint64(0));
         FHE.allowThis(encryptedTotalPolicies);
 
-        encryptedTotalBenefitRecords = FHE.asEuint64(0);
+        encryptedTotalBenefitRecords = FHE.asEuint64(uint64(0));
         FHE.allowThis(encryptedTotalBenefitRecords);
     }
 
@@ -277,12 +277,12 @@ contract CrypticBenefitNetworkV2 {
         policy.isActive = true;
         policy.encryptedMaxAmount = encryptedMaxAmount;
         FHE.allowThis(encryptedMaxAmount);
-        policy.encryptedTotalClaims = FHE.asEuint64(0);
+        policy.encryptedTotalClaims = FHE.asEuint64(uint64(0));
         FHE.allowThis(policy.encryptedTotalClaims);
 
         policiesByCreator[msg.sender].push(policyId);
 
-        encryptedTotalPolicies = FHE.add(encryptedTotalPolicies, FHE.asEuint64(1));
+        encryptedTotalPolicies = FHE.add(encryptedTotalPolicies, FHE.asEuint64(uint64(1)));
         FHE.allowThis(encryptedTotalPolicies);
 
         emit PolicyCreated(policyId, msg.sender, name);
@@ -309,7 +309,7 @@ contract CrypticBenefitNetworkV2 {
         policy.encryptedTotalClaims = FHE.add(policy.encryptedTotalClaims, encryptedAmount);
         FHE.allowThis(policy.encryptedTotalClaims);
 
-        encryptedTotalBenefitRecords = FHE.add(encryptedTotalBenefitRecords, FHE.asEuint64(1));
+        encryptedTotalBenefitRecords = FHE.add(encryptedTotalBenefitRecords, FHE.asEuint64(uint64(1)));
         FHE.allowThis(encryptedTotalBenefitRecords);
 
         emit EncryptedBenefitRecorded(recordId, policyId, msg.sender);
