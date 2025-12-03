@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "fhevm/lib/TFHE.sol";
+import {FHE, euint64, euint32} from "@fhevm/solidity/lib/FHE.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {IAggregator} from "../interfaces/IAggregator.sol";
 import {IAccessControl} from "../interfaces/IAccessControl.sol";
 
@@ -9,8 +10,9 @@ import {IAccessControl} from "../interfaces/IAccessControl.sol";
  * @title Aggregator
  * @dev FHE-encrypted aggregation contract - aggregates encrypted benefit statistics and manages obfuscated reserves
  * @notice Implements FHE encryption for privacy-preserving statistical aggregation
+ * @dev Updated for fhEVM 0.9.1 - inherits ZamaEthereumConfig for automatic coprocessor setup
  */
-contract Aggregator is IAggregator {
+contract Aggregator is IAggregator, ZamaEthereumConfig {
     
     // ============ State Variables ============
     
@@ -51,11 +53,16 @@ contract Aggregator is IAggregator {
         uint256 totalBenefits,
         uint256 totalAmount
     ) external onlyAuthorized {
-        encryptedStats.encryptedTotalMembers = TFHE.asEuint64(totalMembers);
-        encryptedStats.encryptedTotalBenefits = TFHE.asEuint64(totalBenefits);
-        encryptedStats.encryptedTotalAmount = TFHE.asEuint64(totalAmount);
-        encryptedStats.encryptedLastUpdated = TFHE.asEuint32(block.timestamp);
-        
+        // Encrypt stats using FHE (fhEVM 0.9.1)
+        encryptedStats.encryptedTotalMembers = FHE.asEuint64(uint64(totalMembers));
+        FHE.allowThis(encryptedStats.encryptedTotalMembers);
+        encryptedStats.encryptedTotalBenefits = FHE.asEuint64(uint64(totalBenefits));
+        FHE.allowThis(encryptedStats.encryptedTotalBenefits);
+        encryptedStats.encryptedTotalAmount = FHE.asEuint64(uint64(totalAmount));
+        FHE.allowThis(encryptedStats.encryptedTotalAmount);
+        encryptedStats.encryptedLastUpdated = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedStats.encryptedLastUpdated);
+
         emit StatsUpdated(totalMembers, totalBenefits, totalAmount, block.timestamp);
     }
     
@@ -64,58 +71,74 @@ contract Aggregator is IAggregator {
         bytes calldata encryptedTotalBenefits,
         bytes calldata encryptedTotalAmount
     ) external onlyAuthorized {
-        // For actual FHE usage, encrypted data should be decoded properly
-        encryptedStats.encryptedTotalMembers = TFHE.asEuint64(0); // Placeholder
-        encryptedStats.encryptedTotalBenefits = TFHE.asEuint64(0); // Placeholder
-        encryptedStats.encryptedTotalAmount = TFHE.asEuint64(0); // Placeholder
-        encryptedStats.encryptedLastUpdated = TFHE.asEuint32(block.timestamp);
-        
+        // For actual FHE usage, encrypted data should be decoded properly using FHE (fhEVM 0.9.1)
+        encryptedStats.encryptedTotalMembers = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(encryptedStats.encryptedTotalMembers);
+        encryptedStats.encryptedTotalBenefits = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(encryptedStats.encryptedTotalBenefits);
+        encryptedStats.encryptedTotalAmount = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(encryptedStats.encryptedTotalAmount);
+        encryptedStats.encryptedLastUpdated = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedStats.encryptedLastUpdated);
+
         emit StatsUpdated(0, 0, 0, block.timestamp); // Values are encrypted
     }
     
     function updateObfuscatedReserve(uint256 newReserve) external onlyAuthorized {
-        obfuscatedReserve = TFHE.asEuint64(newReserve);
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        obfuscatedReserve = FHE.asEuint64(uint64(newReserve));
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(newReserve, block.timestamp);
     }
-    
+
     function updateEncryptedReserve(bytes calldata encryptedNewReserve) external onlyAuthorized {
-        obfuscatedReserve = TFHE.asEuint64(0); // Placeholder
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        obfuscatedReserve = FHE.asEuint64(uint64(0)); // Placeholder
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(0, block.timestamp); // Value is encrypted
     }
-    
+
     function addToReserve(uint256 amount) external onlyAuthorized {
-        euint64 additionalAmount = TFHE.asEuint64(amount);
-        obfuscatedReserve = TFHE.add(obfuscatedReserve, additionalAmount);
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        euint64 additionalAmount = FHE.asEuint64(uint64(amount));
+        obfuscatedReserve = FHE.add(obfuscatedReserve, additionalAmount);
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(0, block.timestamp); // Value is encrypted
     }
-    
+
     function addEncryptedToReserve(bytes calldata encryptedAmount) external onlyAuthorized {
-        euint64 additionalAmount = TFHE.asEuint64(0); // Placeholder
-        obfuscatedReserve = TFHE.add(obfuscatedReserve, additionalAmount);
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        euint64 additionalAmount = FHE.asEuint64(uint64(0)); // Placeholder
+        obfuscatedReserve = FHE.add(obfuscatedReserve, additionalAmount);
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(0, block.timestamp); // Value is encrypted
     }
-    
+
     function subtractFromReserve(uint256 amount) external onlyAuthorized {
-        euint64 subtractAmount = TFHE.asEuint64(amount);
-        obfuscatedReserve = TFHE.sub(obfuscatedReserve, subtractAmount);
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        euint64 subtractAmount = FHE.asEuint64(uint64(amount));
+        obfuscatedReserve = FHE.sub(obfuscatedReserve, subtractAmount);
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(0, block.timestamp); // Value is encrypted
     }
-    
+
     function subtractEncryptedFromReserve(bytes calldata encryptedAmount) external onlyAuthorized {
-        euint64 subtractAmount = TFHE.asEuint64(0); // Placeholder
-        obfuscatedReserve = TFHE.sub(obfuscatedReserve, subtractAmount);
-        encryptedLastReserveUpdate = TFHE.asEuint32(block.timestamp);
-        
+        euint64 subtractAmount = FHE.asEuint64(uint64(0)); // Placeholder
+        obfuscatedReserve = FHE.sub(obfuscatedReserve, subtractAmount);
+        FHE.allowThis(obfuscatedReserve);
+        encryptedLastReserveUpdate = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encryptedLastReserveUpdate);
+
         emit ReserveUpdated(0, block.timestamp); // Value is encrypted
     }
     
@@ -124,42 +147,43 @@ contract Aggregator is IAggregator {
     function aggregateEncryptedBenefits(
         bytes calldata encryptedBenefitAmounts
     ) external onlyAuthorized returns (bytes memory) {
-        // This would aggregate multiple encrypted benefit amounts
+        // This would aggregate multiple encrypted benefit amounts using FHE (fhEVM 0.9.1)
         // For now, we'll use placeholder
-        euint64 aggregatedAmount = TFHE.asEuint64(0); // Placeholder
-        
+        euint64 aggregatedAmount = FHE.asEuint64(uint64(0)); // Placeholder
+
         // Add to total amount
-        encryptedStats.encryptedTotalAmount = TFHE.add(encryptedStats.encryptedTotalAmount, aggregatedAmount);
-        
+        encryptedStats.encryptedTotalAmount = FHE.add(encryptedStats.encryptedTotalAmount, aggregatedAmount);
+        FHE.allowThis(encryptedStats.encryptedTotalAmount);
+
         return abi.encode(aggregatedAmount);
     }
-    
+
     function calculateEncryptedReserveRatio() external view returns (bytes memory) {
         // Calculate ratio: reserve / total amount
         // This would require FHE division, which is complex
         // For now, return encrypted ratio
         return abi.encode(obfuscatedReserve);
     }
-    
+
     function compareEncryptedReserves(
         bytes calldata encryptedReserve1,
         bytes calldata encryptedReserve2
     ) external returns (bool) {
-        euint64 reserve1 = TFHE.asEuint64(0); // Placeholder
-        euint64 reserve2 = TFHE.asEuint64(0); // Placeholder
-        
-        // Compare encrypted reserves using FHE
+        euint64 reserve1 = FHE.asEuint64(uint64(0)); // Placeholder
+        euint64 reserve2 = FHE.asEuint64(uint64(0)); // Placeholder
+
+        // Compare encrypted reserves using FHE (fhEVM 0.9.1)
         // This would return an encrypted boolean result
         return true; // Placeholder
     }
-    
+
     function calculateEncryptedAverage(
         bytes calldata encryptedAmounts,
         bytes calldata encryptedCount
     ) external returns (bytes memory) {
-        euint64 totalAmount = TFHE.asEuint64(0); // Placeholder
-        euint64 count = TFHE.asEuint64(0); // Placeholder
-        
+        euint64 totalAmount = FHE.asEuint64(uint64(0)); // Placeholder
+        euint64 count = FHE.asEuint64(uint64(0)); // Placeholder
+
         // Calculate average: total / count
         // This would require FHE division
         return abi.encode(totalAmount); // Placeholder

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "fhevm/lib/TFHE.sol";
+import {FHE, euint64, euint32, euint8} from "@fhevm/solidity/lib/FHE.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {IAssessmentEngine} from "../interfaces/IAssessmentEngine.sol";
 import {IAccessControl} from "../interfaces/IAccessControl.sol";
 
@@ -9,8 +10,9 @@ import {IAccessControl} from "../interfaces/IAccessControl.sol";
  * @title AssessmentEngine
  * @dev FHE-encrypted assessment engine contract - handles encrypted benefit assessment calculations
  * @notice Implements FHE encryption for privacy-preserving benefit assessments
+ * @dev Updated for fhEVM 0.9.1 - inherits ZamaEthereumConfig for automatic coprocessor setup
  */
-contract AssessmentEngine is IAssessmentEngine {
+contract AssessmentEngine is IAssessmentEngine, ZamaEthereumConfig {
     
     // ============ State Variables ============
     
@@ -58,14 +60,22 @@ contract AssessmentEngine is IAssessmentEngine {
         require(member != address(0), "Invalid member address");
         require(encryptedAssessmentRequests[requestId].member == address(0), "Request already exists");
         
+        // Create encrypted values using FHE (fhEVM 0.9.1)
+        euint32 encTimestamp = FHE.asEuint32(uint32(block.timestamp));
+        FHE.allowThis(encTimestamp);
+        euint64 encScore = FHE.asEuint64(uint64(0));
+        FHE.allowThis(encScore);
+        euint32 encProcessingTime = FHE.asEuint32(uint32(0));
+        FHE.allowThis(encProcessingTime);
+
         EncryptedAssessmentRequest memory newRequest = EncryptedAssessmentRequest({
             member: member,
             policyId: policyId,
             requestId: requestId,
-            encryptedTimestamp: TFHE.asEuint32(block.timestamp),
+            encryptedTimestamp: encTimestamp,
             status: 0, // Pending
-            encryptedScore: TFHE.asEuint64(0), // Initial score
-            encryptedProcessingTime: TFHE.asEuint32(0), // Initial processing time
+            encryptedScore: encScore, // Initial score
+            encryptedProcessingTime: encProcessingTime, // Initial processing time
             encryptedResult: ""
         });
         
@@ -127,15 +137,16 @@ contract AssessmentEngine is IAssessmentEngine {
         require(encryptedAssessmentRequests[requestId].member != address(0), "Request not found");
         
         // Decode encrypted inputs (e.g., encrypted salary, tenure, performance metrics)
-        // For actual FHE usage, encrypted inputs should be decoded properly
-        euint64 encryptedSalary = TFHE.asEuint64(0); // Placeholder
-        euint32 encryptedTenure = TFHE.asEuint32(0); // Placeholder
-        euint8 encryptedPerformance = TFHE.asEuint8(0); // Placeholder
-        
+        // For actual FHE usage, encrypted inputs should be decoded properly using FHE (fhEVM 0.9.1)
+        euint64 encryptedSalary = FHE.asEuint64(uint64(0)); // Placeholder
+        euint32 encryptedTenure = FHE.asEuint32(uint32(0)); // Placeholder
+        euint8 encryptedPerformance = FHE.asEuint8(uint8(0)); // Placeholder
+
         // Perform encrypted calculations
         // This is a simplified example - in reality, you would have complex FHE operations
-        euint64 score = TFHE.add(encryptedSalary, TFHE.asEuint64(1000)); // Example calculation
-        
+        euint64 score = FHE.add(encryptedSalary, FHE.asEuint64(uint64(1000))); // Example calculation
+        FHE.allowThis(score);
+
         encryptedAssessmentRequests[requestId].encryptedScore = score;
     }
     
@@ -162,12 +173,13 @@ contract AssessmentEngine is IAssessmentEngine {
         // Start with the first score
         euint64 aggregatedScore = encryptedAssessmentRequests[requestIds[0]].encryptedScore;
         
-        // Add all other scores
+        // Add all other scores using FHE (fhEVM 0.9.1)
         for (uint256 i = 1; i < requestIds.length; i++) {
             require(encryptedAssessmentRequests[requestIds[i]].member != address(0), "Request not found");
-            aggregatedScore = TFHE.add(aggregatedScore, encryptedAssessmentRequests[requestIds[i]].encryptedScore);
+            aggregatedScore = FHE.add(aggregatedScore, encryptedAssessmentRequests[requestIds[i]].encryptedScore);
         }
-        
+        FHE.allowThis(aggregatedScore);
+
         return abi.encode(aggregatedScore);
     }
     
