@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Plus, 
-  CheckCircle, 
+import {
+  Plus,
+  CheckCircle,
   XCircle,
   Loader2,
   FileText,
@@ -17,12 +17,13 @@ import {
 } from 'lucide-react';
 import { useCreatePolicy, usePolicyCount, usePolicyDetails } from '@/hooks/useContract';
 import { toast } from 'sonner';
+import { useTransactionNotification } from '@/hooks/useTransactionNotification';
 
 const PolicyManagement = () => {
   const { address, isConnected } = useAccount();
-  const { createPolicy, isPending, isConfirming, isConfirmed, error } = useCreatePolicy();
+  const { createPolicy, isPending, isConfirming, isConfirmed, error, hash } = useCreatePolicy();
   const { data: policyCount, refetch: refetchPolicyCount } = usePolicyCount();
-  
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -30,6 +31,23 @@ const PolicyManagement = () => {
   });
 
   const [policies, setPolicies] = useState<any[]>([]);
+
+  // Transaction notification hook - monitors on-chain status with explorer links
+  const handleTxSuccess = useCallback(() => {
+    refetchPolicyCount();
+    setFormData({ name: '', description: '', maxAmount: '' });
+  }, [refetchPolicyCount]);
+
+  useTransactionNotification({
+    hash,
+    error,
+    isPending,
+    pendingMessage: 'Creating policy...',
+    confirmingMessage: 'Confirming policy creation...',
+    successMessage: 'Policy created successfully!',
+    errorMessage: 'Failed to create policy',
+    onSuccess: handleTxSuccess,
+  });
 
   // Fetch all policies when count changes
   useEffect(() => {
@@ -44,22 +62,6 @@ const PolicyManagement = () => {
       fetchPolicies();
     }
   }, [policyCount]);
-
-  // Refetch when confirmed
-  useEffect(() => {
-    if (isConfirmed) {
-      toast.success('Policy created successfully!');
-      refetchPolicyCount();
-      setFormData({ name: '', description: '', maxAmount: '' });
-    }
-  }, [isConfirmed]);
-
-  // Show error
-  useEffect(() => {
-    if (error) {
-      toast.error('Failed to create policy: ' + error.message);
-    }
-  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

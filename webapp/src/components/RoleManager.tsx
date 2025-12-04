@@ -1,26 +1,43 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Shield, 
-  Users, 
+import {
+  Shield,
+  Users,
   UserPlus,
   CheckCircle,
   XCircle,
   Loader2
 } from 'lucide-react';
 import { useHasRole, useRoleMemberCount, useGrantRole } from '@/hooks/useContract';
+import { useTransactionNotification } from '@/hooks/useTransactionNotification';
 
 const RoleManager = () => {
   const { address } = useAccount();
   const [newAccount, setNewAccount] = useState('');
   const [selectedRole, setSelectedRole] = useState('MEMBER_ROLE');
-  
-  const { grantRole, isPending, isConfirming, isConfirmed, error } = useGrantRole();
+
+  const { grantRole, isPending, isConfirming, isConfirmed, error, hash } = useGrantRole();
+
+  // Transaction notification hook - monitors on-chain status with explorer links
+  const handleTxSuccess = useCallback(() => {
+    setNewAccount('');
+  }, []);
+
+  useTransactionNotification({
+    hash,
+    error,
+    isPending,
+    pendingMessage: 'Granting role...',
+    confirmingMessage: 'Confirming role grant...',
+    successMessage: 'Role granted successfully!',
+    errorMessage: 'Failed to grant role',
+    onSuccess: handleTxSuccess,
+  });
   
   // Check if current user has governor role
   const { data: hasGovernorRole } = useHasRole('0x0000000000000000000000000000000000000000000000000000000000000000', address || '0x0');
