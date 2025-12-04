@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Calculator, 
-  Eye, 
-  Lock, 
+import {
+  Calculator,
+  Eye,
+  Lock,
   CheckCircle,
   AlertCircle,
   Clock,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useRequestAssessment, useActivePolicies } from '@/hooks/useContract';
 import { toast } from 'sonner';
+import { useTransactionNotification } from '@/hooks/useTransactionNotification';
 
 interface AssessmentRequest {
   id: string;
@@ -36,9 +37,9 @@ interface AssessmentRequest {
 
 const AssessmentCenter = () => {
   const { address } = useAccount();
-  const { requestAssessment, isPending, isConfirming, isConfirmed, error } = useRequestAssessment();
+  const { requestAssessment, isPending, isConfirming, isConfirmed, error, hash } = useRequestAssessment();
   const { data: policies, isLoading: policiesLoading } = useActivePolicies();
-  
+
   const [selectedPolicy, setSelectedPolicy] = useState<string>('');
   const [assessments, setAssessments] = useState<AssessmentRequest[]>([
     // Mock data
@@ -63,6 +64,17 @@ const AssessmentCenter = () => {
     }
   ]);
 
+  // Transaction notification hook - monitors on-chain status with explorer links
+  useTransactionNotification({
+    hash,
+    error,
+    isPending,
+    pendingMessage: 'Submitting assessment request...',
+    confirmingMessage: 'Confirming assessment request...',
+    successMessage: 'Assessment request submitted successfully!',
+    errorMessage: 'Failed to submit assessment request',
+  });
+
   const handleRequestAssessment = async () => {
     if (!address || !selectedPolicy) {
       toast.error('Please select a policy and ensure wallet is connected');
@@ -71,7 +83,7 @@ const AssessmentCenter = () => {
 
     try {
       const requestId = await requestAssessment(address, parseInt(selectedPolicy));
-      
+
       // Add new assessment request
       const newAssessment: AssessmentRequest = {
         id: requestId || Date.now().toString(),
@@ -80,14 +92,14 @@ const AssessmentCenter = () => {
         timestamp: Date.now(),
         status: 'pending'
       };
-      
+
       setAssessments(prev => [newAssessment, ...prev]);
-      toast.success('Assessment request submitted successfully!');
-      
+      // Note: Transaction notifications are handled by useTransactionNotification hook
+
       // Simulate processing
       setTimeout(() => {
-        setAssessments(prev => prev.map(assessment => 
-          assessment.id === newAssessment.id 
+        setAssessments(prev => prev.map(assessment =>
+          assessment.id === newAssessment.id
             ? { ...assessment, status: 'processing' }
             : assessment
         ));
@@ -95,10 +107,10 @@ const AssessmentCenter = () => {
 
       // Simulate completion
       setTimeout(() => {
-        setAssessments(prev => prev.map(assessment => 
-          assessment.id === newAssessment.id 
-            ? { 
-                ...assessment, 
+        setAssessments(prev => prev.map(assessment =>
+          assessment.id === newAssessment.id
+            ? {
+                ...assessment,
                 status: 'completed',
                 result: {
                   eligible: Math.random() > 0.3,
@@ -111,7 +123,7 @@ const AssessmentCenter = () => {
       }, 5000);
 
     } catch (err) {
-      toast.error('Failed to request assessment');
+      // Note: Error notifications are handled by useTransactionNotification hook
       console.error(err);
     }
   };

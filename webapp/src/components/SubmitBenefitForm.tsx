@@ -22,13 +22,38 @@ import { toast } from 'sonner';
 import { initializeFHE, encryptBenefitDataFromForm } from '@/lib/fhe';
 import { CONTRACT_ADDRESSES } from '@/config/contracts';
 import { sepolia } from 'wagmi/chains';
+import { useTransactionNotification } from '@/hooks/useTransactionNotification';
+import { useCallback } from 'react';
 
 const SubmitBenefitForm = () => {
   const { address, chain } = useAccount();
-  const { submitEncryptedBenefit, submitPlainBenefit, isPending, isConfirming, isConfirmed, error } = useSubmitBenefit();
+  const { submitEncryptedBenefit, submitPlainBenefit, isPending, isConfirming, isConfirmed, error, hash } = useSubmitBenefit();
   const { data: policiesData, isLoading: policiesLoading } = useActivePolicies();
 
   const [fheInitialized, setFheInitialized] = useState(false);
+
+  // Transaction notification hook - monitors on-chain status
+  const handleTxSuccess = useCallback(() => {
+    // Reset form on success
+    setFormData({
+      policyId: '',
+      benefitType: '',
+      amount: '',
+      description: '',
+      encryptedData: ''
+    });
+  }, []);
+
+  useTransactionNotification({
+    hash,
+    error,
+    isPending,
+    pendingMessage: 'Submitting benefit record...',
+    confirmingMessage: 'Confirming benefit record...',
+    successMessage: 'Benefit record submitted successfully!',
+    errorMessage: 'Failed to submit benefit record',
+    onSuccess: handleTxSuccess,
+  });
 
   const chainId = chain?.id || sepolia.id;
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.PolicyManager as string;
@@ -160,14 +185,14 @@ const SubmitBenefitForm = () => {
         );
         
         console.log('✅ Data encrypted, submitting to blockchain...', encryptedData);
-        
+
         // Submit encrypted benefit record
         submitEncryptedBenefit(
           parseInt(formData.policyId),
           encryptedData
         );
-        
-        toast.success('Benefit record encrypted and submitted with FHE!');
+
+        // Note: Transaction notifications are handled by useTransactionNotification hook
       } else {
         console.warn('⚠️ FHE not initialized, using plaintext submission');
         // Fallback to plaintext submission if FHE is not available
@@ -177,22 +202,14 @@ const SubmitBenefitForm = () => {
           formData.benefitType || 'general',
           formData.description || 'No description'
         );
-        toast.warning('Submitted without FHE encryption (fallback mode)');
+        // Note: Transaction notifications are handled by useTransactionNotification hook
       }
 
-      // Reset form
-      setFormData({
-        policyId: '',
-        benefitType: '',
-        amount: '',
-        description: '',
-        encryptedData: ''
-      });
-      
+      // Form reset is handled by useTransactionNotification onSuccess callback
       setIsEncrypting(false);
     } catch (err) {
       setIsEncrypting(false);
-      toast.error('Failed to submit benefit record');
+      // Note: Error notifications are handled by useTransactionNotification hook
       console.error('❌ Submission error:', err);
     }
   };
