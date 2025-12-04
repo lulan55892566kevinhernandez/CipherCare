@@ -5,9 +5,9 @@ import { sepolia } from 'wagmi/chains';
 export const CONTRACT_ADDRESSES = {
   [sepolia.id]: {
     AccessControl: '0x428a7a4c836bEdb3BFAC9c45Aa722Af54e6959eB',
-    PolicyManager: '0x84a8AECd30Afab760D5Bccd2d5420c55601b1708', // New SimplePolicyManager
-    BenefitVault: '0xC054f4fb4d8366010615d564175A52F3f16749C6', // New SimpleBenefitVault
-    CipherCareNetworkV2: '0xC054f4fb4d8366010615d564175A52F3f16749C6', // Using BenefitVault for now
+    PolicyManager: '0x84a8AECd30Afab760D5Bccd2d5420c55601b1708', // SimplePolicyManager
+    BenefitVault: '0xC054f4fb4d8366010615d564175A52F3f16749C6', // SimpleBenefitVault
+    CipherCareNetworkV2: '0x36128b901DdE49A2FB5DF433119a4490811E7E57', // CrypticBenefitNetworkV2 with fhEVM 0.9.1
   }
 } as const;
 
