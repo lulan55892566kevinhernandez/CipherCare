@@ -15,14 +15,20 @@ import {
   FileText,
   Shield
 } from 'lucide-react';
-import { useCreatePolicy, usePolicyCount, usePolicyDetails } from '@/hooks/useContract';
+import { useV2CreatePolicy, useV2Policies, useV2PolicyDetails } from '@/hooks/useContract';
+import { useSwitchChain } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { toast } from 'sonner';
 import { useTransactionNotification } from '@/hooks/useTransactionNotification';
 
 const PolicyManagement = () => {
-  const { address, isConnected } = useAccount();
-  const { createPolicy, isPending, isConfirming, isConfirmed, error, hash } = useCreatePolicy();
-  const { data: policyCount, refetch: refetchPolicyCount } = usePolicyCount();
+  const { address, isConnected, chain } = useAccount();
+  const { createPolicy, isPending, isConfirming, isConfirmed, error, hash } = useV2CreatePolicy();
+  const { data: policiesData, refetch: refetchPolicies } = useV2Policies();
+  const { switchChain } = useSwitchChain();
+
+  // Check if on wrong network
+  const isWrongNetwork = chain && chain.id !== sepolia.id;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -30,13 +36,27 @@ const PolicyManagement = () => {
     maxAmount: ''
   });
 
-  const [policies, setPolicies] = useState<any[]>([]);
+  // Parse policies from V2 contract data
+  // V2 listPolicies returns: (ids[], names[], statuses[], creators[])
+  let policies: { id: number; name: string; isActive: boolean; creator: string }[] = [];
+
+  if (policiesData && Array.isArray(policiesData) && policiesData.length >= 4) {
+    const [ids, names, statuses, creators] = policiesData as [bigint[], string[], boolean[], string[]];
+    if (ids && ids.length > 0) {
+      policies = ids.map((id, index) => ({
+        id: Number(id),
+        name: names[index] || `Policy ${id}`,
+        isActive: statuses[index] ?? true,
+        creator: creators[index] || ''
+      }));
+    }
+  }
 
   // Transaction notification hook - monitors on-chain status with explorer links
   const handleTxSuccess = useCallback(() => {
-    refetchPolicyCount();
+    refetchPolicies();
     setFormData({ name: '', description: '', maxAmount: '' });
-  }, [refetchPolicyCount]);
+  }, [refetchPolicies]);
 
   useTransactionNotification({
     hash,
@@ -49,23 +69,20 @@ const PolicyManagement = () => {
     onSuccess: handleTxSuccess,
   });
 
-  // Fetch all policies when count changes
-  useEffect(() => {
-    if (policyCount && Number(policyCount) > 0) {
-      const fetchPolicies = async () => {
-        const policyList = [];
-        for (let i = 1; i <= Number(policyCount); i++) {
-          policyList.push(i);
-        }
-        setPolicies(policyList);
-      };
-      fetchPolicies();
-    }
-  }, [policyCount]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Check network first
+    if (isWrongNetwork) {
+      toast.error('Please switch to Sepolia network');
+      try {
+        switchChain({ chainId: sepolia.id });
+      } catch (err) {
+        console.error('Failed to switch network:', err);
+      }
+      return;
+    }
+
     if (!formData.name || !formData.description || !formData.maxAmount) {
       toast.error('Please fill all fields');
       return;
@@ -77,6 +94,7 @@ const PolicyManagement = () => {
       return;
     }
 
+    // Create policy on CipherCareNetworkV2 (FHE contract)
     createPolicy(formData.name, formData.description, Math.floor(amount * 100)); // Convert to cents
   };
 
@@ -162,15 +180,31 @@ const PolicyManagement = () => {
         </CardContent>
       </Card>
 
+      {/* Network Warning */}
+      {isWrongNetwork && (
+        <Alert variant="destructive">
+          <AlertDescription className="flex items-center justify-between">
+            <span>Please switch to Sepolia network to create policies</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => switchChain({ chainId: sepolia.id })}
+            >
+              Switch to Sepolia
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Policies List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Existing Policies
+            Existing Policies (FHE V2)
           </CardTitle>
           <CardDescription>
-            Total policies: {policyCount ? policyCount.toString() : '0'}
+            Total policies: {policies.length}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -183,8 +217,8 @@ const PolicyManagement = () => {
             </Alert>
           ) : (
             <div className="space-y-3">
-              {policies.map((policyId) => (
-                <PolicyCard key={policyId} policyId={policyId} />
+              {policies.map((policy) => (
+                <PolicyCard key={policy.id} policy={policy} />
               ))}
             </div>
           )}
@@ -195,44 +229,21 @@ const PolicyManagement = () => {
 };
 
 // Component to display individual policy details
-const PolicyCard = ({ policyId }: { policyId: number }) => {
-  const { data: policyData, isLoading } = usePolicyDetails(policyId);
+const PolicyCard = ({ policy }: { policy: { id: number; name: string; isActive: boolean; creator: string } }) => {
+  const { data: policyData, isLoading } = useV2PolicyDetails(policy.id);
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-4 flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading policy {policyId}...
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!policyData) {
-    return null;
-  }
-
-  // getPolicyDetails returns: [name, description, isActive, maxAmount, createdAt, priority, creator]
-  const [name, description, isActive, maxAmount, createdAt, priority, creator] = policyData as [
-    string,
-    string,
-    boolean,
-    bigint,
-    bigint,
-    number,
-    string
-  ];
+  // V2 getPolicyDetails returns: [name, description, isActive, creator, createdAt]
+  const description = policyData ? (policyData as any[])[1] : '';
 
   return (
-    <Card className={!isActive ? 'opacity-60' : ''}>
+    <Card className={!policy.isActive ? 'opacity-60' : ''}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold">{name}</h3>
-              <Badge variant={isActive ? 'default' : 'secondary'}>
-                {isActive ? (
+              <h3 className="font-semibold">{policy.name}</h3>
+              <Badge variant={policy.isActive ? 'default' : 'secondary'}>
+                {policy.isActive ? (
                   <>
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Active
@@ -244,11 +255,15 @@ const PolicyCard = ({ policyId }: { policyId: number }) => {
                   </>
                 )}
               </Badge>
-              <Badge variant="outline">ID: {policyId}</Badge>
+              <Badge variant="outline">ID: {policy.id}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground mb-2">{description}</p>
-            <p className="text-sm font-medium">
-              Max Amount: ${(Number(maxAmount) / 100).toFixed(2)}
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading details...</p>
+            ) : description ? (
+              <p className="text-sm text-muted-foreground mb-2">{description}</p>
+            ) : null}
+            <p className="text-xs text-muted-foreground truncate">
+              Creator: {policy.creator.slice(0, 6)}...{policy.creator.slice(-4)}
             </p>
           </div>
         </div>

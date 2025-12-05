@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useSwitchChain } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,10 @@ const SubmitBenefitForm = () => {
   const { address, chain } = useAccount();
   const { submitEncryptedBenefit, submitPlainBenefit, isPending, isConfirming, isConfirmed, error, hash } = useSubmitBenefit();
   const { data: policiesData, isLoading: policiesLoading } = useV2Policies();
+  const { switchChain } = useSwitchChain();
+
+  // Check if on wrong network
+  const isWrongNetwork = chain && chain.id !== sepolia.id;
 
   const [fheInitialized, setFheInitialized] = useState(false);
 
@@ -125,6 +129,17 @@ const SubmitBenefitForm = () => {
 
     if (!address) {
       toast.error('Please connect your wallet');
+      return;
+    }
+
+    // Check network first
+    if (isWrongNetwork) {
+      toast.error('Please switch to Sepolia network');
+      try {
+        switchChain({ chainId: sepolia.id });
+      } catch (err) {
+        console.error('Failed to switch network:', err);
+      }
       return;
     }
 
@@ -297,11 +312,28 @@ const SubmitBenefitForm = () => {
               </AlertDescription>
             </Alert>
 
+            {/* Network Warning */}
+            {isWrongNetwork && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>Please switch to Sepolia network</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => switchChain({ chainId: sepolia.id })}
+                  >
+                    Switch Network
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
-              disabled={isPending || isConfirming || isEncrypting || !formData.policyId}
+              disabled={isPending || isConfirming || isEncrypting || !formData.policyId || isWrongNetwork}
             >
               {isEncrypting ? (
                 <>
