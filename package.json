@@ -1,7 +1,7 @@
 {
   "name": "ciphercare",
-  "version": "2.0.0",
-  "description": "CipherCare - Privacy-preserving employee benefits platform powered by Zama FHE",
+  "version": "2.1.0",
+  "description": "CipherCare - Privacy-preserving employee benefits platform powered by Zama FHE (fhEVM 0.9.1)",
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
@@ -17,6 +17,7 @@
   },
   "keywords": [
     "fhe",
+    "fhevm",
     "privacy",
     "benefits",
     "blockchain",
@@ -27,12 +28,11 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
-    "@fhevm/hardhat-plugin": "^0.1.0",
+    "@fhevm/hardhat-plugin": "^0.3.0-1",
     "hardhat": "^2.22.0"
   },
   "dependencies": {
-    "@fhevm/solidity": "^0.8.0",
-    "fhevm": "^0.5.4",
+    "@fhevm/solidity": "^0.9.1",
     "dotenv": "^16.4.0"
   }
 }
