@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAccount } from 'wagmi';
-import { CONTRACT_ADDRESSES, CRYPTIC_BENEFIT_NETWORK_ABI, POLICY_MANAGER_ABI, BENEFIT_VAULT_ABI, AGGREGATOR_ABI } from '@/config/contracts';
+import { CONTRACT_ADDRESSES, CRYPTIC_BENEFIT_NETWORK_ABI, POLICY_MANAGER_ABI, BENEFIT_VAULT_ABI, AGGREGATOR_ABI, V2_CONTRACT_ABI } from '@/config/contracts';
 import { sepolia } from 'wagmi/chains';
 
 // Hook for reading contract data
@@ -80,13 +80,26 @@ export const useMemberBenefitRecord = (memberAddress: string, index: number) => 
 export const useSubmitBenefit = () => {
   const { chain } = useAccount();
   const chainId = chain?.id || sepolia.id;
-  
+
   const { writeContract, data: hash, error, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
 
+  // Write to CipherCareNetworkV2 (FHE contract)
+  const writeToV2Contract = (functionName: string, args: any[]) => {
+    writeContract({
+      address: CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.CipherCareNetworkV2 as `0x${string}`,
+      abi: V2_CONTRACT_ABI,
+      functionName,
+      args,
+      chainId,
+      gas: 800_000n, // Higher gas limit for FHE operations
+    });
+  };
+
+  // Legacy: Write to SimpleBenefitVault (non-FHE)
   const writeToBenefitVault = (functionName: string, args: any[]) => {
     writeContract({
       address: CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.BenefitVault as `0x${string}`,
@@ -94,39 +107,52 @@ export const useSubmitBenefit = () => {
       functionName,
       args,
       chainId,
-      gas: 500_000n, // Explicit gas limit for Sepolia
+      gas: 500_000n,
     });
   };
 
-  // For encrypted submission (FHE)
-  const submitEncryptedBenefit = (policyId: number, encryptedData: any) => {
-    console.log('🔐 Submitting encrypted benefit with FHE...', encryptedData);
-    
-    // Create a proper FHE-encrypted benefit record
-    // The encrypted data contains: amountHandle, policyIdHandle, benefitTypeHandle, signature
-    const fheRecord = {
-      amountHandle: encryptedData.amountHandle,
-      policyIdHandle: encryptedData.policyIdHandle,
-      benefitTypeHandle: encryptedData.benefitTypeHandle,
-      signature: encryptedData.signature,
-      timestamp: Date.now()
-    };
-    
-    // Encode the FHE data for storage
-    const encodedFheData = JSON.stringify(fheRecord);
-    
-    // Submit to BenefitVault with FHE-encrypted data
-    writeToBenefitVault('recordBenefit', [policyId, 0, 'fhe-encrypted', encodedFheData]);
+  // For REAL FHE encrypted submission to CipherCareNetworkV2
+  const submitEncryptedBenefit = (policyId: number, encryptedData: {
+    amountHandle: `0x${string}`;
+    proof: `0x${string}`;
+  }) => {
+    console.log('🔐 Submitting REAL FHE encrypted benefit to CipherCareNetworkV2...');
+    console.log('📦 Policy ID:', policyId);
+    console.log('📦 Amount Handle:', encryptedData.amountHandle);
+    console.log('📦 Input Proof:', encryptedData.proof);
+
+    // Call recordEncryptedBenefit on CipherCareNetworkV2 contract
+    // This stores the encrypted amount on-chain using FHE
+    writeToV2Contract('recordEncryptedBenefit', [
+      BigInt(policyId),
+      encryptedData.amountHandle,  // externalEuint64 handle
+      encryptedData.proof           // inputProof bytes
+    ]);
   };
 
-  // For benefit submission to SimpleBenefitVault
-  const submitPlainBenefit = (policyId: number, amount: number, benefitType: string, description: string) => {
+  // For plain benefit submission (testing/fallback) to CipherCareNetworkV2
+  const submitPlainBenefit = (policyId: number, amount: number) => {
+    console.log('📝 Submitting plain benefit to CipherCareNetworkV2...');
+    console.log('📦 Policy ID:', policyId);
+    console.log('📦 Amount:', amount);
+
+    // Call recordPlainBenefit on CipherCareNetworkV2 contract
+    // This encrypts the amount on-chain
+    writeToV2Contract('recordPlainBenefit', [
+      BigInt(policyId),
+      BigInt(amount)
+    ]);
+  };
+
+  // Legacy: Submit to SimpleBenefitVault (non-FHE)
+  const submitLegacyBenefit = (policyId: number, amount: number, benefitType: string, description: string) => {
     writeToBenefitVault('recordBenefit', [policyId, amount, benefitType, description]);
   };
 
   return {
     submitEncryptedBenefit,
     submitPlainBenefit,
+    submitLegacyBenefit,
     hash,
     error,
     isPending,
@@ -137,7 +163,7 @@ export const useSubmitBenefit = () => {
 
 export const useRequestAssessment = () => {
   const { write, ...rest } = useContractWrite();
-  
+
   const requestAssessment = (member: string, policyId: number) => {
     write('requestBenefitAssessment', [member, policyId]);
   };
@@ -148,7 +174,75 @@ export const useRequestAssessment = () => {
   };
 };
 
-// Policy Manager hooks
+// ============ CipherCareNetworkV2 (FHE) Hooks ============
+
+// Hook for reading V2 contract data
+export const useV2ContractRead = (functionName: string, args: any[] = []) => {
+  const { chain } = useAccount();
+  const chainId = chain?.id || sepolia.id;
+
+  return useReadContract({
+    address: CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.CipherCareNetworkV2 as `0x${string}`,
+    abi: V2_CONTRACT_ABI,
+    functionName,
+    args,
+    chainId,
+  });
+};
+
+// Hook for listing policies from V2 contract (FHE)
+export const useV2Policies = () => {
+  return useV2ContractRead('listPolicies', []);
+};
+
+// Hook for getting policy details from V2 contract
+export const useV2PolicyDetails = (policyId: number) => {
+  return useV2ContractRead('getPolicyDetails', [BigInt(policyId)]);
+};
+
+// Hook for getting policy benefit count from V2 contract
+export const useV2PolicyBenefitCount = (policyId: number) => {
+  return useV2ContractRead('getPolicyBenefitCount', [BigInt(policyId)]);
+};
+
+// Hook for getting encrypted benefit record from V2 contract
+export const useV2EncryptedBenefitRecord = (policyId: number, index: number) => {
+  return useV2ContractRead('getEncryptedBenefitRecord', [BigInt(policyId), BigInt(index)]);
+};
+
+// Hook for creating policy on V2 contract
+export const useV2CreatePolicy = () => {
+  const { chain } = useAccount();
+  const chainId = chain?.id || sepolia.id;
+
+  const { writeContract, data: hash, error, isPending } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const createPolicy = (name: string, description: string, maxAmount: number) => {
+    writeContract({
+      address: CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.CipherCareNetworkV2 as `0x${string}`,
+      abi: V2_CONTRACT_ABI,
+      functionName: 'createPolicy',
+      args: [name, description, BigInt(maxAmount)],
+      chainId,
+      gas: 800_000n,
+    });
+  };
+
+  return {
+    createPolicy,
+    hash,
+    error,
+    isPending,
+    isConfirming,
+    isConfirmed,
+  };
+};
+
+// Policy Manager hooks (SimplePolicyManager - legacy)
 export const useActivePolicies = () => {
   return usePolicyManagerRead('getActivePolicies', []);
 };

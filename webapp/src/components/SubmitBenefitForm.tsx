@@ -17,9 +17,9 @@ import {
   CheckCircle,
   Loader2
 } from 'lucide-react';
-import { useSubmitBenefit, useActivePolicies } from '@/hooks/useContract';
+import { useSubmitBenefit, useV2Policies } from '@/hooks/useContract';
 import { toast } from 'sonner';
-import { initializeFHE, encryptBenefitDataFromForm } from '@/lib/fhe';
+import { initializeFHE, encryptUint64 } from '@/lib/fhe';
 import { CONTRACT_ADDRESSES } from '@/config/contracts';
 import { sepolia } from 'wagmi/chains';
 import { useTransactionNotification } from '@/hooks/useTransactionNotification';
@@ -28,7 +28,7 @@ import { useCallback } from 'react';
 const SubmitBenefitForm = () => {
   const { address, chain } = useAccount();
   const { submitEncryptedBenefit, submitPlainBenefit, isPending, isConfirming, isConfirmed, error, hash } = useSubmitBenefit();
-  const { data: policiesData, isLoading: policiesLoading } = useActivePolicies();
+  const { data: policiesData, isLoading: policiesLoading } = useV2Policies();
 
   const [fheInitialized, setFheInitialized] = useState(false);
 
@@ -56,51 +56,27 @@ const SubmitBenefitForm = () => {
   });
 
   const chainId = chain?.id || sepolia.id;
-  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.PolicyManager as string;
+  // Use CipherCareNetworkV2 (FHE contract) for encryption target
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]?.CipherCareNetworkV2 as string;
 
-  // Parse policies from contract data
-  // Contract returns: Policy[] (array of Policy structs)
-  let policies = [];
+  // Parse policies from V2 contract data
+  // V2 listPolicies returns: (ids[], names[], statuses[], creators[])
+  let policies: { id: number; name: string; isActive: boolean }[] = [];
 
   console.log('🔍 Raw policiesData:', policiesData);
-  console.log('🔍 policiesData type:', typeof policiesData);
-  console.log('🔍 Array.isArray(policiesData):', Array.isArray(policiesData));
 
-  if (policiesData && Array.isArray(policiesData) && policiesData.length > 0) {
-    console.log('🔍 policiesData length:', policiesData.length);
-    console.log('🔍 policiesData[0]:', policiesData[0]);
-    console.log('🔍 Array.isArray(policiesData[0]):', Array.isArray(policiesData[0]));
+  if (policiesData && Array.isArray(policiesData) && policiesData.length >= 4) {
+    // V2 contract returns: [ids, names, statuses, creators]
+    const [ids, names, statuses, creators] = policiesData as [bigint[], string[], boolean[], string[]];
 
-    // Check if it's an array of Policy structs
-    if (Array.isArray(policiesData[0])) {
-      // It's a nested array (wagmi wraps the result)
-      const policyArray = policiesData[0];
-      console.log('📦 Using nested array, length:', policyArray.length);
-      policies = policyArray.map((policy: any, index: number) => {
-        const parsed = {
-          id: index + 1, // Policy IDs start from 1
-          name: policy[0] || policy.name,
-          description: policy[1] || policy.description,
-          isActive: policy[2] || policy.isActive,
-          maxAmount: Number(policy[3] || policy.maxAmount)
-        };
-        console.log(`📋 Parsed policy ${index + 1}:`, parsed);
-        return parsed;
-      });
-    } else {
-      // Direct array of Policy structs
-      console.log('📦 Using direct array, length:', policiesData.length);
-      policies = policiesData.map((policy: any, index: number) => {
-        const parsed = {
-          id: index + 1,
-          name: policy[0] || policy.name,
-          description: policy[1] || policy.description,
-          isActive: policy[2] || policy.isActive,
-          maxAmount: Number(policy[3] || policy.maxAmount)
-        };
-        console.log(`📋 Parsed policy ${index + 1}:`, parsed);
-        return parsed;
-      });
+    console.log('📦 V2 Policy data:', { ids, names, statuses });
+
+    if (ids && ids.length > 0) {
+      policies = ids.map((id, index) => ({
+        id: Number(id),
+        name: names[index] || `Policy ${id}`,
+        isActive: statuses[index] ?? true,
+      }));
     }
   }
 
@@ -159,49 +135,39 @@ const SubmitBenefitForm = () => {
 
     try {
       setIsEncrypting(true);
-      
+
       // Convert amount to cents (uint64)
       const amountInCents = Math.floor(parseFloat(formData.amount) * 100);
+      const policyId = parseInt(formData.policyId);
 
       if (fheInitialized) {
-        console.log('🔐 Using FHE encryption for benefit submission');
-        
-        // Prepare benefit data for FHE encryption
-        const benefitData = {
-          policyId: parseInt(formData.policyId),
-          amount: amountInCents,
-          benefitType: formData.benefitType || 'general',
-          description: formData.description || 'No description',
-          timestamp: Date.now()
-        };
+        console.log('🔐 Using REAL FHE encryption for CipherCareNetworkV2');
+        console.log('📦 Policy ID:', policyId);
+        console.log('📦 Amount (cents):', amountInCents);
+        console.log('📦 Contract Address:', contractAddress);
 
-        console.log('📦 Encrypting benefit data with FHE...', benefitData);
-        
-        // Encrypt the data using FHE
-        const encryptedData = await encryptBenefitDataFromForm(
-          benefitData,
+        // Encrypt the amount using FHE (only amount needs encryption for V2 contract)
+        const encryptedAmount = await encryptUint64(
+          amountInCents,
           contractAddress,
           address
         );
-        
-        console.log('✅ Data encrypted, submitting to blockchain...', encryptedData);
 
-        // Submit encrypted benefit record
-        submitEncryptedBenefit(
-          parseInt(formData.policyId),
-          encryptedData
-        );
+        console.log('✅ Amount encrypted with FHE:', encryptedAmount);
+        console.log('  - Handle:', encryptedAmount.handle);
+        console.log('  - Proof length:', encryptedAmount.proof.length);
+
+        // Submit to CipherCareNetworkV2.recordEncryptedBenefit
+        submitEncryptedBenefit(policyId, {
+          amountHandle: encryptedAmount.handle,
+          proof: encryptedAmount.proof
+        });
 
         // Note: Transaction notifications are handled by useTransactionNotification hook
       } else {
-        console.warn('⚠️ FHE not initialized, using plaintext submission');
-        // Fallback to plaintext submission if FHE is not available
-        submitPlainBenefit(
-          parseInt(formData.policyId),
-          amountInCents,
-          formData.benefitType || 'general',
-          formData.description || 'No description'
-        );
+        console.warn('⚠️ FHE not initialized, using plain submission to V2 contract');
+        // Fallback to plain submission (amount will be encrypted on-chain)
+        submitPlainBenefit(policyId, amountInCents);
         // Note: Transaction notifications are handled by useTransactionNotification hook
       }
 
@@ -211,6 +177,7 @@ const SubmitBenefitForm = () => {
       setIsEncrypting(false);
       // Note: Error notifications are handled by useTransactionNotification hook
       console.error('❌ Submission error:', err);
+      toast.error(err instanceof Error ? err.message : 'Encryption failed');
     }
   };
 
@@ -251,19 +218,11 @@ const SubmitBenefitForm = () => {
                       Loading policies...
                     </SelectItem>
                   ) : policies && policies.length > 0 ? (
-                    policies.map((policy: any) => {
-                      // Safely convert maxAmount to display format
-                      const maxAmount = typeof policy.maxAmount === 'bigint' 
-                        ? Number(policy.maxAmount) 
-                        : policy.maxAmount;
-                      const displayAmount = isNaN(maxAmount) ? '0' : (maxAmount / 100).toFixed(2);
-                      
-                      return (
-                        <SelectItem key={policy.id} value={policy.id.toString()}>
-                          {policy.name} - ${displayAmount}
-                        </SelectItem>
-                      );
-                    })
+                    policies.filter(p => p.isActive).map((policy) => (
+                      <SelectItem key={policy.id} value={policy.id.toString()}>
+                        {policy.name}
+                      </SelectItem>
+                    ))
                   ) : (
                     <SelectItem value="none" disabled>
                       No active policies available

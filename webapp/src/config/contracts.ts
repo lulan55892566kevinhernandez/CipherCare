@@ -122,8 +122,9 @@ export const CRYPTIC_BENEFIT_NETWORK_ABI = [
   }
 ] as const;
 
-// V2 Contract ABI
+// V2 Contract ABI - CipherCareNetworkV2 with FHE (fhEVM 0.9.1)
 export const V2_CONTRACT_ABI = [
+  // Policy creation
   {
     inputs: [
       { name: 'name', type: 'string' },
@@ -135,6 +136,7 @@ export const V2_CONTRACT_ABI = [
     stateMutability: 'nonpayable',
     type: 'function'
   },
+  // Policy views
   {
     inputs: [
       { name: 'policyId', type: 'uint256' }
@@ -163,6 +165,21 @@ export const V2_CONTRACT_ABI = [
     type: 'function'
   },
   {
+    inputs: [],
+    name: 'nextPolicyId',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'policyId', type: 'uint256' }],
+    name: 'hasPolicy',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // FHE Benefit recording - Plain (for testing)
+  {
     inputs: [
       { name: 'policyId', type: 'uint256' },
       { name: 'amount', type: 'uint64' }
@@ -172,10 +189,11 @@ export const V2_CONTRACT_ABI = [
     stateMutability: 'nonpayable',
     type: 'function'
   },
+  // FHE Benefit recording - Encrypted (real FHE)
   {
     inputs: [
       { name: 'policyId', type: 'uint256' },
-      { name: 'encryptedAmount', type: 'bytes' },
+      { name: 'encryptedAmount', type: 'bytes32' },  // externalEuint64 handle
       { name: 'inputProof', type: 'bytes' }
     ],
     name: 'recordEncryptedBenefit',
@@ -183,12 +201,60 @@ export const V2_CONTRACT_ABI = [
     stateMutability: 'nonpayable',
     type: 'function'
   },
+  // Benefit views
   {
-    inputs: [],
-    name: 'nextPolicyId',
+    inputs: [{ name: 'policyId', type: 'uint256' }],
+    name: 'getPolicyBenefitCount',
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'policyId', type: 'uint256' },
+      { name: 'index', type: 'uint256' }
+    ],
+    name: 'getEncryptedBenefitRecord',
+    outputs: [
+      { name: 'recordId', type: 'bytes32' },
+      { name: 'member', type: 'address' },
+      { name: 'createdAt', type: 'uint256' },
+      { name: 'encryptedAmount', type: 'bytes' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // Policy status management
+  {
+    inputs: [
+      { name: 'policyId', type: 'uint256' },
+      { name: 'isActive', type: 'bool' }
+    ],
+    name: 'setPolicyStatus',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'policyId', type: 'uint256' },
+      { indexed: true, name: 'creator', type: 'address' },
+      { indexed: false, name: 'name', type: 'string' }
+    ],
+    name: 'PolicyCreated',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'recordId', type: 'bytes32' },
+      { indexed: true, name: 'policyId', type: 'uint256' },
+      { indexed: true, name: 'member', type: 'address' }
+    ],
+    name: 'EncryptedBenefitRecorded',
+    type: 'event'
   }
 ] as const;
 
