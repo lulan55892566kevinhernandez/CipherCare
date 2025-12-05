@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://cdn.zama.org" />
     <title>CipherCare - Privacy-First Employee Benefits Platform</title>
     <meta name="description" content="CipherCare is a privacy-preserving employee benefits platform powered by Zama's Fully Homomorphic Encryption (FHE) technology for secure, confidential benefits management on-chain" />
     <meta name="author" content="CipherCare Team" />
@@ -20,8 +21,12 @@
 
   <body>
     <div id="root"></div>
-    <!-- Load FHE SDK before the app -->
-    <script src="/relayer-sdk-js.umd.cjs"></script>
+    <!-- Load Zama FHE Relayer SDK from CDN -->
+    <script
+      src="https://cdn.zama.org/relayer-sdk-js/0.3.0-5/relayer-sdk-js.umd.cjs"
+      defer
+      crossorigin="anonymous"
+    ></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
