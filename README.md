@@ -304,6 +304,7 @@ struct BenefitRecord {
 | AccessControl | `0x428a7a4c836bEdb3BFAC9c45Aa722Af54e6959eB` | Role management |
 | SimplePolicyManager | `0x84a8AECd30Afab760D5Bccd2d5420c55601b1708` | Policy CRUD |
 | SimpleBenefitVault | `0xC054f4fb4d8366010615d564175A52F3f16749C6` | Benefit storage |
+| **CipherCareNetworkV2** | `0x36128b901DdE49A2FB5DF433119a4490811E7E57` | **FHE-enabled (fhEVM 0.9.1)** |
 
 ---
 
